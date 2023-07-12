@@ -1,8 +1,12 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    android-nixpkgs = {
+      url = "github:tadfisher/android-nixpkgs/stable";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
-  outputs = { self, nixpkgs}: let
+  outputs = { self, nixpkgs, android-nixpkgs}: let
     pkgs = import nixpkgs {
       system = "x86_64-linux";
       config.allowUnfree = true;
@@ -18,19 +22,30 @@
       autoDepsList = true;
     };
     devShells."x86_64-linux".default = let
-      android = pkgs.callPackage ./android.nix {};
+      android-sdk = android-nixpkgs.sdk.x86_64-linux (sdkPkgs: with sdkPkgs; [
+        build-tools-30-0-3
+        build-tools-33-0-0
+        platform-tools
+        platforms-android-33
+        emulator
+        patcher-v4
+        cmdline-tools-latest
+      ]);
       in pkgs.mkShell {
       buildInputs = [
         pkgs.flutter
 
         # For android
         pkgs.jdk17
-        android.platform-tools
+        android-sdk
+        pkgs.gradle
       ];
 
-      ANDROID_HOME = "${android.androidsdk}/libexec/android-sdk";
-      JAVA_HOME = pkgs.jdk17;
+      ANDROID_HOME = "${android-sdk}/share/android-sdk";
+      ANDROID_SDK_ROOT = "${android-sdk}/share/android-sdk";
+      JAVA_HOME = pkgs.jdk17.home;
       ANDROID_AVD_HOME = (toString ./.) + "/.android/avd";
+      GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${android-sdk}/share/android-sdk/build-tools/33.0.0/aapt2";
     };
   };
 }
